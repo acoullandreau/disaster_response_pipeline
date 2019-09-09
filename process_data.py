@@ -12,6 +12,21 @@ args = parser.parse_args()
 
 
 def load_file(file_path):
+    """
+        Load data function.
+        This function considers the extension of the target file to load.
+        It supports:
+        - .csv
+        - .json
+        - .xml
+        - .db
+
+        Inputs:
+            file_path - relative file path including the file name and its extension
+        Outputs:
+            file_content - pandas DataFrame containing the data of the input file
+    """
+
     # grabs the extension of the file provided as input
     input_suffix = Path(file_path).suffix
 
@@ -54,9 +69,22 @@ def load_file(file_path):
     return file_content
 
 
-def create_feat_from_col(df, col):
+def create_feat_from_col(df, col, val_sep):
+    """
+        Creates new columns from a column containing multiple values.
+
+        Inputs:
+            df - the dataframe to look into
+            col - the specific column containing multiple values to split
+            val_sep - the separator to use to split the values
+
+        Outputs:
+            new_features -> a dataframe containing one column per value, the
+            header being the values of the first row
+    """
+
     # create a dataframe from the values in the col
-    new_features = df[col].str.split(';', expand=True)
+    new_features = df[col].str.split(val_sep, expand=True)
 
     # use the first row of the dataframe to get the new columns names
     first_row = new_features.loc[1]
@@ -69,6 +97,31 @@ def create_feat_from_col(df, col):
 
 
 def extract_value(df, split_char, char_to_get, to_num=True, cols=None):
+    """
+        Extracts specific characters from a string and uses this extracted content
+        as the values of a column.
+
+        Load data function.
+        This function considers the extension of the target file to load.
+        It supports:
+        - .csv
+        - .json
+        - .xml
+        - .db
+
+        Inputs:
+            df - the dataframe to look into
+            split_char - the separator to use to split the values
+            char_to_get - which value to keep from the splitting
+            to_num - set to True by default, whether we want to convert
+                to numeric the extracted value or not
+            cols - set to None by default, which means all columns of the df
+                should be looked at
+
+        Outputs:
+            new_df -> a dataframe containing the values extracted
+    """
+
     new_df = df.copy()
     if cols is None:
         columns = df.columns
@@ -85,6 +138,20 @@ def extract_value(df, split_char, char_to_get, to_num=True, cols=None):
 
 
 def store_to_db(database, df, table_name):
+    """
+        Stores the content of a dataframe to a target table in a database using
+        sqlachemy.
+        WARNING: If the table alread exists it is replaced by the new data.
+
+        Inputs:
+            database - the database to connect to
+            df - the dataframe to load to the database
+            table_name - the name of the table to create or update
+        Outputs:
+            engine -> the engine created to establish a connection to the database
+            (returned for future use)
+    """
+
     engine = create_engine('sqlite:///DisasterResponse.db')
     df.to_sql(table_name, engine, if_exists='replace', index=False)
 
@@ -101,7 +168,7 @@ def main():
                 categories = load_file('categories.csv')
 
                 # create a feature per value of categories
-                cat_df = create_feat_from_col(categories, 'categories')
+                cat_df = create_feat_from_col(categories, 'categories', ';')
                 cat_df = extract_value(cat_df, '-', 1)
 
                 # merge the new category dataframe to the messages dataframe
