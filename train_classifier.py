@@ -31,7 +31,7 @@ nltk.download('wordnet')
 parser = argparse.ArgumentParser()
 parser.add_argument('db_path', help='Path or name of the database where to store the data')
 parser.add_argument('model_path', help='Path to the pickle file of the saved ML model')
-parser.add_argument('-g', '--grid-search', default=False, action="store_true", 
+parser.add_argument('-g', '--grid_search', default=False, action="store_true", 
                     help='If true, gridsearch is executed to find best hyperparameters set')
 args = parser.parse_args()
 
@@ -92,7 +92,7 @@ def compute_metrics(y_test, y_pred, global_avg=False):
             reports[column] = report
             i += 1
 
-    report_global = classification_report(y_test, y_pred, labels=np.unique(y_pred[:,i]), output_dict=True)
+    report_global = classification_report(y_test, y_pred, labels=np.unique(y_pred), output_dict=True)
     reports['global'] = report_global
 
     return reports
@@ -114,21 +114,22 @@ def main():
             df = load_data(args.db_path)
 
             # define features and labels
-            X, y = get_feat_label(df, ['', 4], [5, ''])
+            X = df['message']  # X is only the message column
+            y = df.iloc[:, 5:]
 
             # we define the pipeline
             pipeline = Pipeline([
                 ('vect', CountVectorizer(tokenizer=tokenize)),
                 ('tfidf', TfidfTransformer()),
-                ('clf', MultiOutputClassifier(RandomForestClassifier(random_state=42), n_jobs=1))
+                ('clf', MultiOutputClassifier(RandomForestClassifier(random_state=42, n_jobs=-1)))
             ])
             # for the MultiOutputClassifier, we initially set n_jobs to -1 but
             # this cause GridSearchCV to fail - so n_jobs is set back to 1.
 
             # we split the column 'message' of X and the whole y dataframe into train and test sets
-            X_train, X_test, y_train, y_test = train_test_split(X['message'], y, test_size=0.2, random_state=42)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            if args.check_only is False:
+            if args.grid_search is False:
                 # we fit the pipeline using the training sets
                 pipeline.fit(X_train, y_train)
 
@@ -139,13 +140,13 @@ def main():
                 # let's set a list of parameters that have an influence on all estimators
                 parameters = {
                     'vect__ngram_range':[(1, 1), (1, 2)],
-                    'vect__max_df':[0.5, 0.75, 1],
-                    'vect__max_features':[None, 5000, 10000],
-                    'clf__estimator__min_samples_leaf': [1, 2, 4],
-                    'clf__estimator__min_samples_split': [2, 3, 4],
-                    'clf__estimator__max_depth': [None, 10, 20, 50],
-                    'clf__estimator__max_features': ['auto', 'log2'],
-                    'clf__estimator__n_estimators':[10, 100, 250]
+                    # 'vect__max_df':[0.5, 0.75, 1],
+                    # 'vect__max_features':[None, 5000, 10000],
+                    # 'clf__estimator__min_samples_leaf': [1, 2, 4],
+                    # 'clf__estimator__min_samples_split': [2, 3, 4],
+                    # 'clf__estimator__max_depth': [None, 10, 20, 50],
+                    # 'clf__estimator__max_features': ['auto', 'log2'],
+                    #'clf__estimator__n_estimators':[10, 100, 250]
                 }
 
                 cv = GridSearchCV(pipeline, param_grid=parameters, cv=3) 
