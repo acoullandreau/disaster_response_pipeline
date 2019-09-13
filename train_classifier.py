@@ -209,6 +209,8 @@ def append_results_to_df(df, results, scenario):
         df_2 = create_df_from_dict(results, scenario)
         df = pd.concat([df, df_2], axis=1)
 
+    df.sort_values('F1_score_{}'.format(scenario), inplace=True)
+
     return df
 
 
@@ -224,7 +226,7 @@ def main():
 
             # we define the pipeline
             pipeline = Pipeline([
-                ('vect', CountVectorizer(tokenizer=tokenize)),
+                ('vect', CountVectorizer(tokenizer=tokenize, ngram_range=(1, 2),  max_df=0.5)),
                 ('tfidf', TfidfTransformer()),
                 ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42)))
             ])
