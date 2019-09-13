@@ -1,3 +1,30 @@
+"""
+    This script aims at:
+    - loading two data sources from various formats (csv, json, db,...)
+    - parse the format of those sources
+    - merge the sources into a single dataframe
+    - load the data onto the table of a database
+
+    Input:
+    ------
+    To launch the script, type the following command from the directory where the script is contained:
+    python process_data.py disaster_messages.csv disaster_categories.csv DisasterResponse.db`
+
+    where 
+    disaster_messages.csv and disaster_categories.csv are data sources
+    and DisasterResponse.db is the database onto which load the parsed data
+
+    Note that it is possible to make this script evolve simply to add more data
+    sources to merge
+    Besides, the table created will have a default name MessagesWithCategory
+
+    Output:
+    ------
+    The database with the table containing the merged data
+    On the console will be printed the dataframe that is loaded onto the database.
+
+"""
+
 # import libraries
 import argparse
 import pandas as pd
