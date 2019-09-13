@@ -1,3 +1,30 @@
+"""
+    This script aims at:
+    - training a model using the data from a database (training set)
+    - predicting labels on a testing set and reporting accuracy metrics
+    - use GridSearch if required to look for the best combination of hyperparameters
+    - save the model's parameters as a pickle file that can be loaded later on
+
+    Input:
+    ------
+    To launch the script, type the following command from the directory where the script is contained:
+    python train_classifier.py DisasterResponse.db classifier.pkl [-g]
+
+    where DisasterResponse.db is the database containing the data source
+    classifier.pkl is the name to give to the pickle file created to save the model
+    and -g is an optional parameter, if specified GridSearch will be executed
+
+    Note that the table to use in the database will have to be specified after launching the script
+
+    Output:
+    ------
+    The pickle file saving the model will be created in the same directory where the script is contained.
+    On the console will be printed:
+    - the best parameters used by GridSearch (if -g was passed as an argument to the script)
+    - the accuracy metrics of the prediction of the model
+
+"""
+
 # import libraries
 # note that sklearn's version should be at least 0.20.0
 
@@ -39,6 +66,16 @@ lemmatizer = WordNetLemmatizer()  # global variable used for the tokenization of
 
 
 def load_data(database_path):
+    """
+        Loads the data from the specified database using sqlachemy.
+
+        Inputs:
+            database - the database to connect to
+            user_prompt/table_name - the name of the table to create or update
+        Outputs:
+            df -> a dataframe containing the data available in the table
+    """
+
     engine = create_engine('sqlite:///{}'.format(database_path))
     table_name = input("Please provide the name of the table to use as a date source: ")
     if table_name:
@@ -61,6 +98,21 @@ def get_feat_label(df, X_idx, y_idx):
 
 
 def tokenize(text):
+    """
+        Data cleaning and tranformation function, that parses the data and
+        outputs a simplified data content.
+        Parsing includes:
+        - removal of the URLs
+        - removal of the punctuation
+        - tokenization of the text
+        - lemmatization of the tokenized text (words)
+
+        Inputs:
+            text - the data to transform
+        Outputs:
+            words - the words contained in the data after parsing
+    """
+
     # we convert the text to lower case
     text = text.lower()
 
@@ -83,17 +135,25 @@ def tokenize(text):
     return words
 
 
-def compute_metrics(y_test, y_pred, global_avg=False):
-    reports = {}
-    if global_avg is False:
-        i = 0
-        for column in y_test.columns:
-            report = classification_report(y_test[column], y_pred[:,i], labels=np.unique(y_pred[:,i]), output_dict=True)
-            reports[column] = report
-            i += 1
+def compute_metrics(y_test, y_pred):
+    """
+        Generate classification_report (accuracy metrics agains y_test) for each categories of y_pred
 
-    report_global = classification_report(y_test, y_pred, labels=np.unique(y_pred), output_dict=True)
-    reports['global'] = report_global
+        Inputs:
+            y_test - the reference labels for the training set
+            y_pred - the predicting labels using the model
+        Outputs:
+            reports - a dictionary with all the accuracy metrics of the comparison
+            between y_test and y_pred
+    """
+
+    i = 0
+    reports = {}
+    for column in y_test.columns:
+        report = classification_report(y_test[column], y_pred[:, i], labels=np.unique(y_pred[:, i]), output_dict=True)
+        reports[column] = report['weighted avg']
+        reports[column]['accuracy'] = (y_pred[:, i] == y_test[column]).mean()
+        i += 1
 
     return reports
 
@@ -105,6 +165,51 @@ def print_report_metrics(reports):
         print('     Precision (avg):', reports[report]['weighted avg']['precision'])
         print('     Recall (avg):', reports[report]['weighted avg']['recall'])
         print('\n')
+
+
+def create_df_from_dict(results, scenario):
+    """
+        Transforms the results dictionary into a dataframe.
+
+        Inputs:
+            results - the dictionary outputted by compute_metrics function
+            scenario - the tag name of the scenario associated with the series of metrics scores
+        Outputs:
+            df - a dataframe with each category as a row and each metric as a colum (precision, recall...)
+    """
+
+    df = pd.DataFrame.from_dict(results, orient='index')
+    df.drop('support', axis=1, inplace=True)
+    df.rename(columns={"precision": 'Precision_{}'.format(scenario),
+                       "recall": 'Recall_{}'.format(scenario),
+                       "f1-score":'F1_score_{}'.format(scenario),
+                       "accuracy":'Accuracy_{}'.format(scenario)}, inplace=True)
+    return df
+
+
+def append_results_to_df(df, results, scenario):
+    """
+        Appends the dataframe built with create_df_from_dict function to an existing
+        results dataframe. This allows comparison of various scenarios.
+
+        Inputs:
+            df - the dataframe to append new results to
+            results - the dictionary containing the metrics scores
+            scenario - the tag name of the scenario associated with the series
+            of metrics scores
+        Outputs:
+            df - a dataframe with each category as a row and each metric as a
+            colum (precision, recall...) for all scenarios
+    """
+
+    if df.empty:
+        df = create_df_from_dict(results, scenario)
+
+    else:
+        df_2 = create_df_from_dict(results, scenario)
+        df = pd.concat([df, df_2], axis=1)
+
+    return df
 
 
 def main():
@@ -121,7 +226,7 @@ def main():
             pipeline = Pipeline([
                 ('vect', CountVectorizer(tokenizer=tokenize)),
                 ('tfidf', TfidfTransformer()),
-                ('clf', MultiOutputClassifier(RandomForestClassifier(random_state=42, n_jobs=-1)))
+                ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42)))
             ])
             # for the MultiOutputClassifier, we initially set n_jobs to -1 but
             # this cause GridSearchCV to fail - so n_jobs is set back to 1.
@@ -135,30 +240,34 @@ def main():
 
                 # we predict the categories using the testing set
                 y_pred = pipeline.predict(X_test)
+                scenario = 'default_config'
 
             else:
                 # let's set a list of parameters that have an influence on all estimators
                 parameters = {
-                    'vect__ngram_range':[(1, 1), (1, 2)],
-                    # 'vect__max_df':[0.5, 0.75, 1],
-                    # 'vect__max_features':[None, 5000, 10000],
-                    # 'clf__estimator__min_samples_leaf': [1, 2, 4],
-                    # 'clf__estimator__min_samples_split': [2, 3, 4],
-                    # 'clf__estimator__max_depth': [None, 10, 20, 50],
-                    # 'clf__estimator__max_features': ['auto', 'log2'],
-                    #'clf__estimator__n_estimators':[10, 100, 250]
+                    'vect__ngram_range': [(1, 1), (1, 2), (1, 3)],
+                    'vect__max_df': [0.25, 0.5, 0.75],
+                    'clf__estimator__max_features': ['auto', 'log2'],
+                    'clf__estimator__n_estimators': [100, 250, 500]
                 }
 
-                cv = GridSearchCV(pipeline, param_grid=parameters, cv=3) 
-                # we specify cv=3, i.e the cross-validation splitting strategy - 3 folds 
+                cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, cv=3)
+                # we specify cv=3, i.e the cross-validation splitting strategy - 3 folds
+                # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
 
                 # let's repeat the fit and predict steps but now trying with all combinations of parameters set above
+                print('The best combination of parameters is the folllwing: ', cv.best_params_)
                 cv.fit(X_train, y_train)
                 y_pred = cv.predict(X_test)
+                scenario = 'gridsearch_config'
 
             # we compute the score metrics of the model's prediction
-            reports = compute_metrics(y_test, y_pred, global_avg=False)
-            print_report_metrics(reports)
+            results = compute_metrics(y_test, y_pred)
+            df_results = pd.DataFrame()
+            df_results = append_results_to_df(df_results, results, scenario)
+            print(df_results)
+
+            # we save the model
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
