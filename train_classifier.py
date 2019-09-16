@@ -39,6 +39,8 @@ import numpy as np
 import pandas as pd
 import re
 from sqlalchemy import create_engine
+import pickle
+import os
 
 # import for ML pipeline
 from sklearn.ensemble import RandomForestClassifier
@@ -135,6 +137,47 @@ def tokenize(text):
     return words
 
 
+def build_model(grid_search):
+    """
+        Define a pipeline with standard parameters and applies gridsearch with
+        a list of predifined parameters if user launches the script with -g
+
+        Inputs:
+            grid_search - flag optionally passed as an argument when launching
+            the script ; if set to True grid_search is applied
+        Outputs:
+            model - the model to be used to fit and predict
+            scenario - tag used to label the results in the end
+    """
+
+    # we define the pipeline
+    pipeline = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize, ngram_range=(1, 2),  max_df=0.5)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42)))
+    ])
+
+    if grid_search is False:
+        model = pipeline
+        scenario = 'default_config'
+
+    else:
+        # let's set a list of parameters that have an influence on all estimators
+        parameters = {
+            'vect__ngram_range': [(1, 1), (1, 2), (1, 3)],
+            'clf__estimator__n_estimators': [10, 100, 250, 500]
+        }
+
+        cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, cv=5)
+        # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
+
+        print('The best combination of parameters is the following: ', cv.best_params_)
+        model = cv
+        scenario = 'gridsearch_config'
+
+    return model, scenario
+
+
 def compute_metrics(y_test, y_pred):
     """
         Generate classification_report (accuracy metrics agains y_test) for each categories of y_pred
@@ -182,8 +225,8 @@ def create_df_from_dict(results, scenario):
     df.drop('support', axis=1, inplace=True)
     df.rename(columns={"precision": 'Precision_{}'.format(scenario),
                        "recall": 'Recall_{}'.format(scenario),
-                       "f1-score":'F1_score_{}'.format(scenario),
-                       "accuracy":'Accuracy_{}'.format(scenario)}, inplace=True)
+                       "f1-score": 'F1_score_{}'.format(scenario),
+                       "accuracy": 'Accuracy_{}'.format(scenario)}, inplace=True)
     return df
 
 
@@ -214,62 +257,76 @@ def append_results_to_df(df, results, scenario):
     return df
 
 
+def save_model(model_path, model):
+    filename = model_path
+    pickle.dump(model, open(filename, 'wb'))
+
+
+def is_model(model_path):
+    if os.path.isfile(model_path):
+        return True
+    return False
+
+
+def load_model(model_path, grid_search):
+    loaded_model = pickle.load(open(model_path, 'rb'))
+
+    if grid_search is False:
+        model = loaded_model
+        scenario = 'loaded_model'
+
+    else:
+        parameters = input("Please provide the dictionary of hyperparameters to use with grid_search: ")
+
+        cv = GridSearchCV(loaded_model, param_grid=parameters, n_jobs=-1, cv=5)
+        # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
+
+        print('The best combination of parameters is the following: ', cv.best_params_)
+        model = cv
+        scenario = 'loaded_gridsearch'
+
+    return model, scenario
+
+
 def main():
     if args.model_path:
         if args.db_path:
             # load data from database
+            print('Loading data...')
             df = load_data(args.db_path)
 
             # define features and labels
             X = df['message']  # X is only the message column
             y = df.iloc[:, 5:]
 
-            # we define the pipeline
-            pipeline = Pipeline([
-                ('vect', CountVectorizer(tokenizer=tokenize, ngram_range=(1, 2),  max_df=0.5)),
-                ('tfidf', TfidfTransformer()),
-                ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42)))
-            ])
-            # for the MultiOutputClassifier, we initially set n_jobs to -1 but
-            # this cause GridSearchCV to fail - so n_jobs is set back to 1.
-
             # we split the column 'message' of X and the whole y dataframe into train and test sets
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            if args.grid_search is False:
-                # we fit the pipeline using the training sets
-                pipeline.fit(X_train, y_train)
-
-                # we predict the categories using the testing set
-                y_pred = pipeline.predict(X_test)
-                scenario = 'default_config'
+            print('Preparing the model...')
+            if is_model(args.model_path):
+                model, scenario = load_model(args.model_path, args.grid_search)
 
             else:
-                # let's set a list of parameters that have an influence on all estimators
-                parameters = {
-                    'vect__ngram_range': [(1, 1), (1, 2), (1, 3)],
-                    'vect__max_df': [0.25, 0.5, 0.75],
-                    'clf__estimator__max_features': ['auto', 'log2'],
-                    'clf__estimator__n_estimators': [100, 250, 500]
-                }
+                model, scenario = build_model(args.grid_search)
 
-                cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, cv=3)
-                # we specify cv=3, i.e the cross-validation splitting strategy - 3 folds
-                # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
+            print('Fitting the model...')
+            # we fit the pipeline using the training sets
+            model.fit(X_train, y_train)
 
-                # let's repeat the fit and predict steps but now trying with all combinations of parameters set above
-                print('The best combination of parameters is the folllwing: ', cv.best_params_)
-                cv.fit(X_train, y_train)
-                y_pred = cv.predict(X_test)
-                scenario = 'gridsearch_config'
+            print('Predicting the categories...')
+            # we predict the categories using the testing set
+            y_pred = model.predict(X_test)
 
+            print('Preparing the score reports...')
             # we compute the score metrics of the model's prediction
             results = compute_metrics(y_test, y_pred)
             df_results = pd.DataFrame()
             df_results = append_results_to_df(df_results, results, scenario)
+            print('Score metrics report:\n')
             print(df_results)
 
             # we save the model
+            save_model(args.model_path, model)
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
