@@ -113,16 +113,11 @@ def build_model(pipeline, grid_search):
         scenario = 'default_config'
 
     else:
-        # let's set a list of parameters that have an influence on all estimators
-        parameters = {
-            'vect__ngram_range': [(1, 1), (1, 2), (1, 3)],
-            'clf__estimator__n_estimators': [10, 100, 250, 500]
-        }
-        print("It's OK!")
+        parameters = input("Please provide the dictionary of hyperparameters to use with grid_search: ")
+
         cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, cv=5)
         # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
 
-        print('The best combination of parameters is the following: ', cv.best_params_)
         model = cv
         scenario = 'gridsearch_config'
 
@@ -230,7 +225,6 @@ def save_model(model_path, model):
 def structure_pipeline(df, full_txt_process):
 
     if full_txt_process:
-        print("It's OK!")
         word_cat_dict = word_count_per_cat(df)
 
         pipeline = Pipeline([
@@ -375,6 +369,8 @@ def main():
 
             print('Evaluating the model...')
             # we compute the score metrics of the model's prediction
+            if args.grid_search:
+                print('The best combination of parameters is the following: ', model.best_params_)
             results = compute_metrics(y_test, y_pred)
             df_results = pd.DataFrame()
             df_results = append_results_to_df(df_results, results, scenario)
