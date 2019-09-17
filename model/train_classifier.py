@@ -5,16 +5,19 @@
     - use GridSearch if required to look for the best combination of hyperparameters
     - save the model's parameters as a pickle file that can be loaded later on
 
+    It is assumed that this script will be ran from the highest level of
+    directory (not from the "model" folder).
+
     Input:
     ------
     To launch the script, type the following command from the directory where the script is contained:
-    python train_classifier.py DisasterResponse.db classifier.pkl [-g]
+    python train_classifier.py DisasterResponse.db classifier.pkl conf.json
 
     where DisasterResponse.db is the database containing the data source
     classifier.pkl is the name to give to the pickle file created to save the model
-    and -g is an optional parameter, if specified GridSearch will be executed
-
-    Note that the table to use in the database will have to be specified after launching the script
+    and conf.json contains the table to use in the database and all the
+    optional parameters to train the model, such as whether to use grid search,
+    with which hyperpameters...
 
     Output:
     ------
@@ -23,6 +26,19 @@
     - the best parameters used by GridSearch (if -g was passed as an argument to the script)
     - the accuracy metrics of the prediction of the model
 
+    Note on the parameters to use in the conf.json file
+    - CountVectorizer is used, see sklearn doc to use the right hyperparameters
+    - RandomForestClassifier is used, see sklearn doc to use the right hyperparameters
+    - TF-IDF is currently used only with default hyperparameters, it is not
+    possible to add some in the conf.file without updating the code of this script
+    - if full_txt_process is true:
+        - features__input_text_pipeline__vect__ to modify count_vectorizer parameters
+        - features__input_text_pipeline__tfidf__ to modify tfidf parameters
+        - clf__estimator__ to modify classifier parameters
+    - if full_txt_process is false:
+        - vect__ to modify count_vectorizer parameters
+        - tfidf__ to modify tfidf parameters
+        - clf__estimator__ to modify classifier parameters
 """
 
 # import libraries
@@ -35,20 +51,23 @@ from nltk.stem.wordnet import WordNetLemmatizer
 
 # import for object manipulation
 import argparse
+import json
 import numpy as np
 import pandas as pd
-import re
-from sqlalchemy import create_engine
 import pickle
 import os
+import re
+from sqlalchemy import create_engine
+import sys
 
 # import for ML pipeline
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.pipeline import Pipeline, FeatureUnion
+
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.multioutput import MultiOutputClassifier
-from sklearn.metrics import classification_report
+from sklearn.pipeline import Pipeline, FeatureUnion
 from TextProcess import AverageWordLength, NumWords, NumStopWords, PopPerCat
 
 import nltk
@@ -59,10 +78,6 @@ nltk.download('wordnet')
 parser = argparse.ArgumentParser()
 parser.add_argument('db_path', help='Path or name of the database where to store the data')
 parser.add_argument('model_path', help='Path to the pickle file of the saved ML model')
-parser.add_argument('-g', '--grid_search', default=False, action="store_true", 
-                    help='If true, gridsearch is executed to find best hyperparameters set')
-parser.add_argument('-f', '--full_txt_process', default=False, action="store_true", 
-                    help='If true, more complex pipeline is executed with additional text transformers')
 args = parser.parse_args()
 
 lemmatizer = WordNetLemmatizer()  # global variable used for the tokenization of the data
@@ -95,7 +110,7 @@ def append_results_to_df(df, results, scenario):
     return df
 
 
-def build_model(pipeline, grid_search):
+def build_model(pipeline, grid_search, params):
     """
         Define a pipeline with standard parameters and applies gridsearch with
         a list of predifined parameters if user launches the script with -g
@@ -113,11 +128,7 @@ def build_model(pipeline, grid_search):
         scenario = 'default_config'
 
     else:
-        parameters = input("Please provide the dictionary of hyperparameters to use with grid_search: ")
-
-        cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=-1, cv=5)
-        # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
-
+        cv = GridSearchCV(pipeline, param_grid=params, cv=5)
         model = cv
         scenario = 'gridsearch_config'
 
@@ -173,7 +184,7 @@ def is_model(model_path):
     return False
 
 
-def load_data(database_path):
+def load_data(database_path, table_name):
     """
         Loads the data from the specified database using sqlachemy.
 
@@ -185,36 +196,38 @@ def load_data(database_path):
     """
 
     engine = create_engine('sqlite:///{}'.format(database_path))
-    table_name = input("Please provide the name of the table to use as a date source: ")
     if table_name:
         try:
             df = pd.read_sql('SELECT * FROM {}'.format(table_name), engine)
         except:
             raise
     else:
-        table_name = input("Please provide the name of the table to use as a date source: ")
+        raise AttributeError('Please provide the name of the table to use as a date source')
 
     return df
 
 
-def load_model(model_path, grid_search):
+def load_model(model_path, grid_search, params):
     loaded_model = pickle.load(open(model_path, 'rb'))
 
-    if grid_search is False:
-        model = loaded_model
-        scenario = 'loaded_model'
+    if 'cv' in loaded_model.get_params().keys():
+        print('It seems like the saved model is a GridSearch instance.\n'
+              'A new model will therefore be created using the hyperparameters set in the conf file.\n'
+              'If you do not wish to continue, please stop the process and modify the conf file.')
+        print('Best hyperparameters of the saved GridSearch model: ', loaded_model.best_params_)
+        return (0, 0)
 
     else:
-        parameters = input("Please provide the dictionary of hyperparameters to use with grid_search: ")
+        if grid_search is False:
+            model = loaded_model
+            scenario = 'loaded_model'
 
-        cv = GridSearchCV(loaded_model, param_grid=parameters, n_jobs=-1, cv=5)
-        # we specify n_jobs = -1 as to be able to parallelise the execution of GridSearch
+        else:
+            cv = GridSearchCV(loaded_model, param_grid=params, cv=5)
+            model = cv
+            scenario = 'loaded_gridsearch'
 
-        print('The best combination of parameters is the following: ', cv.best_params_)
-        model = cv
-        scenario = 'loaded_gridsearch'
-
-    return model, scenario
+        return (model, scenario)
 
 
 def save_model(model_path, model):
@@ -222,7 +235,7 @@ def save_model(model_path, model):
     pickle.dump(model, open(filename, 'wb'))
 
 
-def structure_pipeline(df, full_txt_process):
+def structure_pipeline(df, count_vect_params, clf_params, full_txt_process=False):
 
     if full_txt_process:
         word_cat_dict = word_count_per_cat(df)
@@ -230,15 +243,15 @@ def structure_pipeline(df, full_txt_process):
         pipeline = Pipeline([
             ('features', FeatureUnion([
                 ('input_text_pipeline', Pipeline([
-                    ('vect', CountVectorizer(tokenizer=tokenize, ngram_range=(1, 2))),
+                    ('vect', CountVectorizer(tokenizer=tokenize, **count_vect_params)),
                     ('tfidf', TfidfTransformer()),
                 ])),
                 ('feat_eng_length', Pipeline([
                     ('average_length', AverageWordLength()),
-                ])), 
+                ])),
                 ('feat_eng_count', Pipeline([
                     ('word_count', NumWords()),
-                ])), 
+                ])),
                 ('feat_eng_stop_count', Pipeline([
                     ('stop_word_count', NumStopWords()),
                 ])),
@@ -247,14 +260,14 @@ def structure_pipeline(df, full_txt_process):
                 ])),
             ])),
 
-            ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=250, random_state=42, n_jobs=-1)))
+            ('clf', MultiOutputClassifier(RandomForestClassifier(**clf_params)))
         ])
 
     else:
         pipeline = Pipeline([
-            ('vect', CountVectorizer(tokenizer=tokenize, ngram_range=(1, 2),  max_df=0.5)),
+            ('vect', CountVectorizer(tokenizer=tokenize, **count_vect_params)),
             ('tfidf', TfidfTransformer()),
-            ('clf', MultiOutputClassifier(RandomForestClassifier(n_estimators=250, random_state=42)))
+            ('clf', MultiOutputClassifier(RandomForestClassifier(**clf_params)))
         ])
 
     return pipeline
@@ -336,9 +349,18 @@ def word_count_per_cat(df):
 def main():
     if args.model_path:
         if args.db_path:
-            # load data from database
+            with open('model/conf.json', encoding='utf-8') as config_file:
+                conf_data = json.load(config_file)
+
+            data_table = conf_data['data_table']
+            count_vect_params = conf_data['count_vect_params']
+            clf_params = conf_data['clf_params']
+            grid_search = conf_data['grid_search']
+            g_s_params = conf_data['grid_search_parameters']
+            full_txt_process = conf_data['full_txt_process']
+            # we load the data from the database
             print('Loading data...')
-            df = load_data(args.db_path)
+            df = load_data(args.db_path, data_table)
 
             # define features and labels
             X = df['message']  # X is only the message column
@@ -348,16 +370,19 @@ def main():
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
             print('Preparing the model...')
-            if is_model(args.model_path):
-                model, scenario = load_model(args.model_path, args.grid_search)
+            use_loaded_model = is_model(args.model_path)
+            if use_loaded_model is True:
+                (model, scenario) = load_model(args.model_path, grid_search, g_s_params)
+                if model == 0:
+                    use_loaded_model = False
 
-            else:
-                if args.full_txt_process:
-                    pipeline = structure_pipeline(df, True)
+            if use_loaded_model is False:
+                if full_txt_process:
+                    pipeline = structure_pipeline(df, count_vect_params, clf_params, True)
                 else:
-                    pipeline = structure_pipeline(df)
+                    pipeline = structure_pipeline(df, count_vect_params, clf_params)
 
-                model, scenario = build_model(pipeline, args.grid_search)
+                model, scenario = build_model(pipeline, grid_search, g_s_params)
 
             print('Fitting the model...')
             # we fit the pipeline using the training sets
@@ -369,18 +394,19 @@ def main():
 
             print('Evaluating the model...')
             # we compute the score metrics of the model's prediction
-            if args.grid_search:
+            if grid_search:
                 print('The best combination of parameters is the following: ', model.best_params_)
             results = compute_metrics(y_test, y_pred)
             df_results = pd.DataFrame()
             df_results = append_results_to_df(df_results, results, scenario)
-            print('Score metrics report:\n')
-            print(df_results)
+            if conf_data['print_report']:
+                print('Score metrics report:\n')
+                print(df_results)
 
             # we save the model
             print('Saving the model...')
             save_model(args.model_path, model)
-            print('Model saved!Ò')
+            print('Model saved!')
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
