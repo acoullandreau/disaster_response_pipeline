@@ -74,6 +74,9 @@ class PopPerCat(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
 
+    def get_params(self, deep=False):
+        return {'word_dict': self.word_cat_dict}
+
     def transform(self, X):
         X_count_cat = pd.DataFrame()
         for x in X:

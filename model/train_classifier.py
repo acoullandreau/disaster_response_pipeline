@@ -58,7 +58,6 @@ import pickle
 import os
 import re
 from sqlalchemy import create_engine
-import sys
 
 # import for ML pipeline
 from sklearn.ensemble import RandomForestClassifier
@@ -256,7 +255,7 @@ def structure_pipeline(df, count_vect_params, clf_params, full_txt_process=False
                     ('stop_word_count', NumStopWords()),
                 ])),
                 ('feat_eng_pop', Pipeline([
-                    ('word_count_per_cat', PopPerCat(word_dict=word_cat_dict)),
+                    ('word_count_per_cat', PopPerCat(word_cat_dict)),
                 ])),
             ])),
 
