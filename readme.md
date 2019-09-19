@@ -70,25 +70,45 @@ General comments about the train_classifier.py:
 Web app
 -------
 
+How to use it
+Presentation of the different visualizations available
+
 
 
 Comments on the data
 ---------------------
 
-Classes unbalanced
--------------------
+Imbalance of class and data modeling choices
+---------------------------------------------
+
+![alt text](data/img_classes_unbalanced.png "Imbalance of classed")
+
+The data used to train the model is clearly imbalanced: only a small percentage of the messages were labeled with each class, which makes both the interpretation of the overall accuracy and the accuracy of the model's prediction more difficult to evaluate. 
+This is why when building our model we paid attention to:
+- using a ML model that is not too sensitive to imbalanced data, with in particular a hyperpamater (boostrap=True) that ensure data sampling
+- using a metric that is less sensitive to imbalanced data than accucary: the F1-score
+
+Besides, to evaluate the performance of a model of a set of hyperparameters we focused on the score of the categories on the far right of the graph above, those categories that had enough values on both classes. 
 
 
 Data cleaning
 --------------
 
+The data cleaning process actually occured at two different moments:
+- in the ETL pipeline, when transforming the data from one source into another format to be able to merge it to the data of the other source prior to loading it into the database
+- in the ML pipeline, when applying NLP techniques to engineer new features to be able to train the model
 
-Data modeling
---------------
+The cleaning in the first pipeline is rather straight forward: the categorical data was encoded, allowing vectorization later on.
+Regarding the NLP techniques used, here are the methods implemented:
+- Tokenization -> removal of punctuation, stopwords, URL and capital letters, lemmatization, to reduce each message to a list of roots of the most meaningful words
+- CountVectorizer, with ngram_range set to (1, 2) instead of (1,1) -> vectorization of the list of words of each message
+- TF-IDF with the default parameters -> adding a weight to each occurence count of a word based on how many documents use this particular word
+- Custom tranformers:
+	- calculate the average word length of each message
+	- calculate the number of words and stop words of each message
+	- compute the number of words of each message that are associated with each category (by looking at the category of each message in which a given word is used)
 
-Go into more detail about the dataset and your data cleaning and modeling process in your README file, add screenshots of your web app and model results.
-
-This dataset is imbalanced (ie some labels like water have few examples). In your README, discuss how this imbalance, how that affects training the model, and your thoughts about emphasizing precision or recall for the various categories.
+The first 3 estimators are used by default in the ML pipeline, while the custom transformers are used only when setting full_txt_process to True in the conf.json file. 
 
 
 Further work and improvements
