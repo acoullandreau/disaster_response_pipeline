@@ -75,7 +75,7 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('db_path', help='Path or name of the database where to store the data')
+parser.add_argument('db_path', help='Path or name of the database where the data is stored')
 parser.add_argument('model_path', help='Path to the pickle file of the saved ML model')
 args = parser.parse_args()
 
