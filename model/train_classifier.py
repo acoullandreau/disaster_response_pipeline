@@ -325,8 +325,25 @@ def prepare_model(prepare_model_dict):
     return model, scenario
 
 
+def word_count_per_cat(df, list_of_cats, process):
+    word_cat_dict = {}
+    for row in range(len(df)):
+        message = df.iloc[row, 1]
+        words = tokenize(message)
+        list_of_cat = list_of_cats[row]
+
+        if list_of_cat != []:
+            if process == 'preprocess_viz':
+                build_output_dict(word_cat_dict, list_of_cat, words)
+            elif process == 'full_txt_process':
+                build_output_dict(word_cat_dict, words, list_of_cat)
+    print(word_cat_dict)
+    return word_cat_dict
+
+
 def preprocess_visualisation(list_of_cats, df):
 
+    print('Preprocessing the data for visualisations')
     # save preprocessed df for imbalance of class bar chart
     df_source = df.drop(['id', 'message', 'original', 'genre'], axis=1)
     counts = []
@@ -352,7 +369,7 @@ def preprocess_visualisation(list_of_cats, df):
     pickle.dump(data_length, open('data/df_word_length.pkl', 'wb'))
 
     # save proprocessed df for most popular word per category bar chart
-    word_cat_dict = word_count_per_cat(df, list_of_cats, 'preprocess_visualisation')
+    word_cat_dict = word_count_per_cat(df, list_of_cats, 'preprocess_viz')
 
     pop_word = pd.DataFrame()
     pop_word['category'] = word_cat_dict.keys()
