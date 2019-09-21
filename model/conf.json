@@ -15,6 +15,6 @@
         "clf__estimator__n_estimators":[10, 100, 250]
     },
     "print_report":true,
-    "preprocess_viz":true,
+    "preprocess_viz":true
 
 }
