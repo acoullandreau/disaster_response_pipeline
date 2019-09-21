@@ -1,3 +1,4 @@
+from bokeh.palettes import viridis
 import json
 import numpy as np
 import plotly
@@ -6,8 +7,7 @@ import re
 
 from flask import Flask
 from flask import render_template, request
-import plotly.express as px
-import plotly.graph_objects as go
+from plotly.graph_objects import Bar, Heatmap, Scatter
 import joblib
 from sqlalchemy import create_engine
 
@@ -75,6 +75,25 @@ model = joblib.load(model_path)
 @app.route('/index')
 def index():
 
+    # support functions
+    def build_color_palette(unique_target, target):
+        color_palette = viridis(len(unique_target))
+        color_item = {}
+        i = 0
+        for item_to_color in unique_target:
+            color_select = color_palette[i].lstrip('#')
+            color_select = tuple(int(color_select[i:i+2], 16) for i in (0, 2, 4))
+            color_item[item_to_color] = color_select
+            i += 1
+        return color_item
+
+    def get_color_scale(color_item, target):
+        colors = ['rgb({0}, {1}, {2})'.format(color_item[item_to_color][0],
+                                              color_item[item_to_color][1],
+                                              color_item[item_to_color][2])
+                  for item_to_color in target]
+        return colors
+
     # visualize average length distribution
     def word_length(text):
         words = text.split()
@@ -91,6 +110,7 @@ def index():
     df_avg_length['length'] = comp_avg_length(df['message'])['message']
     df_avg_length['genre'] = df['genre']
     data_length = df_avg_length[df_avg_length['length'] < 40]
+    colors_avg_length = build_color_palette(df_avg_length['genre'].unique(), data_length['genre'])
 
     # visualize count per genre
     genre_counts = df.groupby('genre').count()['message']
@@ -119,30 +139,64 @@ def index():
     graphs = [
         {
             'data': [
-                go.Bar(
+                Bar(
                     name='0',
                     x=data_stat['Disaster message category'],
                     y=data_stat['Distribution ratio - 0']),
-                go.Bar(
+                Bar(
                     name='1',
                     x=data_stat['Disaster message category'],
                     y=data_stat['Distribution ratio - 1'])
             ],
             'layout': {
                 'barmode': 'group',
-                'xaxis_tickangle': -45,
-                'title_text': 'Distribution ratio of messages for each disaster category',
-                'xaxis_title': 'Category',
-                'yaxis_title': 'Percentage'
+                'title': 'Distribution ratio of messages for each disaster category',
+                'xaxis': {
+                    'title': 'Category',
+                    'tickangle': -45
+                },
+                'yaxis': {
+                    'title': 'Percentage'
+                },
+                'margin': {
+                    'l': 20,
+                    'r': 20,
+                    't': 20,
+                    'b': 20
+                }
             }
         },
         {
             'data': [
-                px.scatter(
-                    data_length,
-                    x="index",
-                    y="length",
-                    color="genre"
+                Scatter(
+                    name='direct',
+                    x=data_length[data_length['genre'] == 'direct']['index'],
+                    y=data_length[data_length['genre'] == 'direct']['length'],
+                    showlegend=True,
+                    mode='markers',
+                    marker={
+                        'color': colors_avg_length['direct']
+                        }
+                ),
+                Scatter(
+                    name='news',
+                    x=data_length[data_length['genre'] == 'news']['index'],
+                    y=data_length[data_length['genre'] == 'news']['length'],
+                    showlegend=True,
+                    mode='markers',
+                    marker={
+                        'color': colors_avg_length['news']
+                        }
+                ),
+                Scatter(
+                    name='social',
+                    x=data_length[data_length['genre'] == 'social']['index'],
+                    y=data_length[data_length['genre'] == 'social']['length'],
+                    showlegend=True,
+                    mode='markers',
+                    marker={
+                        'color': colors_avg_length['social']
+                        }
                 )
             ],
 
@@ -153,7 +207,7 @@ def index():
         },
         {
             'data': [
-                go.Bar(
+                Bar(
                     x=genre_names,
                     y=genre_counts
                 )
@@ -171,7 +225,7 @@ def index():
         },
         {
             'data': [
-                go.Heatmap(
+                Heatmap(
                     z=corr_list,
                     x=data_corr.columns,
                     y=data_corr.columns,
