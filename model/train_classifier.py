@@ -149,6 +149,11 @@ def build_output_dict(var_a, var_b):
     return output_dict
 
 
+def comp_avg_length(X):
+    X_avg_length = pd.Series(X).apply(word_length)
+    return pd.DataFrame(X_avg_length)
+
+
 def compute_metrics(y_test, y_pred):
     """
         Generate classification_report (accuracy metrics agains y_test) for each categories of y_pred
@@ -323,8 +328,31 @@ def prepare_model(prepare_model_dict):
     return model, scenario
 
 
-def preprocess_visualisation(list_of_cats):
-    print('Yay!')
+def preprocess_visualisation(list_of_cats, df):
+
+    # save preprocessed df for imbalance of class
+    df_source = df.drop(['id', 'message', 'original', 'genre'], axis=1)
+    counts = []
+    categories = list(df_source.columns.values)
+    for i in categories:
+        messages_tagged_1 = df_source[i].sum()
+        messages_tagged_1 = messages_tagged_1*100/df_source.shape[0]
+        messages_tagged_0 = df_source.shape[0]-df_source[i].sum()
+        messages_tagged_0 = messages_tagged_0*100/df_source.shape[0]
+        counts.append((i, messages_tagged_1, messages_tagged_0))
+    data_stat = pd.DataFrame(counts, columns=['Disaster message category',
+                                              'Distribution ratio - 1',
+                                              'Distribution ratio - 0'])
+    data_stat.sort_values(by=['Distribution ratio - 1'], inplace=True)
+    pickle.dump(data_stat, open('data/df_class_imbalance.pkl', 'wb'))
+
+    # save preprocessed df for word length scatter plot
+    df_avg_length = pd.DataFrame()
+    df_avg_length['index'] = df['id']
+    df_avg_length['length'] = comp_avg_length(df['message'])['message']
+    df_avg_length['genre'] = df['genre']
+    data_length = df_avg_length[df_avg_length['length'] < 40]
+    pickle.dump(data_length, open('data/df_word_length.pkl', 'wb'))
 
 
 def save_model(model_path, model):
@@ -425,6 +453,13 @@ def word_count_per_cat(df, list_of_cats, process):
     return word_cat_dict
 
 
+def word_length(text):
+    words = text.split()
+    if len(words) > 0:
+        avg_length = sum(len(word) for word in words)/len(words)
+        return avg_length
+
+
 def main():
     if args.model_path:
         if args.db_path:
@@ -481,7 +516,7 @@ def main():
 
             # we preprocess the data for the visualisations
             if preprocess_viz:
-                preprocess_visualisation(list_of_cats)
+                preprocess_visualisation(list_of_cats, df)
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
