@@ -352,7 +352,7 @@ def preprocess_visualisation(list_of_cats, df):
     pickle.dump(data_length, open('data/df_word_length.pkl', 'wb'))
 
     # save proprocessed df for most popular word per category bar chart
-    word_cat_dict = word_cat_dict = word_count_per_cat(df, list_of_cats, 'preprocess_visualisation')
+    word_cat_dict = word_count_per_cat(df, list_of_cats, 'preprocess_visualisation')
 
     pop_word = pd.DataFrame()
     pop_word['category'] = word_cat_dict.keys()
@@ -461,10 +461,10 @@ def word_count_per_cat(df, list_of_cats, process):
 
         if list_of_cat != []:
             if process == 'preprocess_viz':
-                build_output_dict(word_cat_dict, list_of_cat, words)
+                word_cat_dict = build_output_dict(word_cat_dict, list_of_cat, words)
             elif process == 'full_txt_process':
-                build_output_dict(word_cat_dict, words, list_of_cat)
-
+                word_cat_dict = build_output_dict(word_cat_dict, words, list_of_cat)
+    print(word_cat_dict)
     return word_cat_dict
 
 

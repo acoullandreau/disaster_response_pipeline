@@ -52,10 +52,10 @@ def tokenize(text):
 
 
 def build_color_palette(target):
-    color_palette = viridis(len(unique_target))
+    color_palette = viridis(len(target))
     color_item = {}
     i = 0
-    for item_to_color in unique_target:
+    for item_to_color in target:
         color_select = color_palette[i].lstrip('#')
         color_select = tuple(int(color_select[i:i+2], 16) for i in (0, 2, 4))
         color_item[item_to_color] = color_select
