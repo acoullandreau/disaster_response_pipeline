@@ -313,7 +313,7 @@ def prepare_model(prepare_model_dict):
 
     if use_loaded_model is False:
         if full_txt_process:
-            word_cat_dict = word_count_per_cat(df, list_of_cats, 'full_txt_process')
+            word_count_per_cat(df, list_of_cats, 'full_txt_process')
             full_txt_params = [True, word_cat_dict]
             pipeline = structure_pipeline(df, count_vect_params, clf_params, full_txt_params)
         else:
@@ -323,6 +323,22 @@ def prepare_model(prepare_model_dict):
         model, scenario = build_model(pipeline, grid_search, g_s_params)
 
     return model, scenario
+
+
+def word_count_per_cat(df, list_of_cats, process):
+    word_cat_dict = {}
+    for row in range(len(df)):
+        message = df.iloc[row, 1]
+        words = tokenize(message)
+        list_of_cat = list_of_cats[row]
+
+        if list_of_cat != []:
+            if process == 'preprocess_viz':
+                build_output_dict(word_cat_dict, list_of_cat, words)
+            elif process == 'full_txt_process':
+                build_output_dict(word_cat_dict, words, list_of_cat)
+    print(word_cat_dict)
+    return word_cat_dict
 
 
 def preprocess_visualisation(list_of_cats, df):
