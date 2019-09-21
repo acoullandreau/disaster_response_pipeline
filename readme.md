@@ -27,6 +27,7 @@ The code is written in Python 3.7.
 There are several dependencies for this package. The versions provided here are those used for testing.
 
 - argparse 1.1
+- bokeh 1.3.4 (for coloring of the visualisations)
 - json 2.0.9
 - nltk 3.4.4
 - numpy 1.16.4
