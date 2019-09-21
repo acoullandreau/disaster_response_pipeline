@@ -177,6 +177,23 @@ def create_df_from_dict(results, scenario):
     return df
 
 
+def evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report):
+    print('Evaluating the model...')
+    if grid_search:
+        print('The best combination of parameters is the following: ', model.best_params_)
+        results = compute_metrics(y_test, y_pred)
+        df_results = pd.DataFrame()
+        df_results = append_results_to_df(df_results, results, scenario)
+        if print_report:
+            print('Score metrics report:\n')
+            print(df_results)
+
+
+def fit_model(model, X_train, y_train):
+    print('Fitting the model...')
+    model.fit(X_train, y_train)
+
+
 def is_model(model_path):
     if os.path.isfile(model_path):
         return True
@@ -194,6 +211,7 @@ def load_data(database_path, table_name):
             df -> a dataframe containing the data available in the table
     """
 
+    print('Loading data...')
     engine = create_engine('sqlite:///{}'.format(database_path))
     if table_name:
         try:
@@ -229,9 +247,44 @@ def load_model(model_path, grid_search, params):
         return (model, scenario)
 
 
+def predict_model(model, X_test):
+    print('Predicting the categories...')
+    y_pred = model.predict(X_test)
+    return y_pred
+
+
+def prepare_model(prepare_model_dict):
+    model_path = prepare_model_dict['model_path']
+    grid_search = prepare_model_dict['grid_search']
+    g_s_params = prepare_model_dict['g_s_params']
+    full_txt_process = prepare_model_dict['full_txt_process']
+    df = prepare_model_dict['df']
+    count_vect_params = prepare_model_dict['count_vect_params']
+    clf_params = prepare_model_dict['clf_params']
+
+    print('Preparing the model...')
+    use_loaded_model = is_model(model_path)
+    if use_loaded_model is True:
+        (model, scenario) = load_model(model_path, grid_search, g_s_params)
+        if model == 0:
+            use_loaded_model = False
+
+    if use_loaded_model is False:
+        if full_txt_process:
+            pipeline = structure_pipeline(df, count_vect_params, clf_params, True)
+        else:
+            pipeline = structure_pipeline(df, count_vect_params, clf_params)
+
+        model, scenario = build_model(pipeline, grid_search, g_s_params)
+
+    return model, scenario
+
+
 def save_model(model_path, model):
+    print('Saving the model...')
     filename = model_path
     pickle.dump(model, open(filename, 'wb'))
+    print('Model saved!')
 
 
 def structure_pipeline(df, count_vect_params, clf_params, full_txt_process=False):
@@ -357,8 +410,9 @@ def main():
             grid_search = conf_data['grid_search']
             g_s_params = conf_data['grid_search_parameters']
             full_txt_process = conf_data['full_txt_process']
+            print_report = conf_data['print_report']
+
             # we load the data from the database
-            print('Loading data...')
             df = load_data(args.db_path, data_table)
 
             # define features and labels
@@ -368,44 +422,27 @@ def main():
             # we split the column 'message' of X and the whole y dataframe into train and test sets
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            print('Preparing the model...')
-            use_loaded_model = is_model(args.model_path)
-            if use_loaded_model is True:
-                (model, scenario) = load_model(args.model_path, grid_search, g_s_params)
-                if model == 0:
-                    use_loaded_model = False
+            # we build the pipeline
+            prepare_model_dict = {'model_path': args.model_path,
+                                  'grid_search': grid_search,
+                                  'g_s_params': g_s_params, 'df': df,
+                                  'full_txt_process': full_txt_process,
+                                  'count_vect_params': count_vect_params,
+                                  'clf_params': clf_params}
 
-            if use_loaded_model is False:
-                if full_txt_process:
-                    pipeline = structure_pipeline(df, count_vect_params, clf_params, True)
-                else:
-                    pipeline = structure_pipeline(df, count_vect_params, clf_params)
+            model, scenario = prepare_model(prepare_model_dict)
 
-                model, scenario = build_model(pipeline, grid_search, g_s_params)
-
-            print('Fitting the model...')
             # we fit the pipeline using the training sets
-            model.fit(X_train, y_train)
+            fit_model(model, X_train, y_train)
 
-            print('Predicting the categories...')
             # we predict the categories using the testing set
-            y_pred = model.predict(X_test)
+            y_pred = predict_model(model, X_test)
 
-            print('Evaluating the model...')
             # we compute the score metrics of the model's prediction
-            if grid_search:
-                print('The best combination of parameters is the following: ', model.best_params_)
-            results = compute_metrics(y_test, y_pred)
-            df_results = pd.DataFrame()
-            df_results = append_results_to_df(df_results, results, scenario)
-            if conf_data['print_report']:
-                print('Score metrics report:\n')
-                print(df_results)
+            evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report)
 
             # we save the model
-            print('Saving the model...')
             save_model(args.model_path, model)
-            print('Model saved!')
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
