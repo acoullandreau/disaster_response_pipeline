@@ -134,6 +134,21 @@ def build_model(pipeline, grid_search, params):
     return model, scenario
 
 
+def build_output_dict(var_a, var_b):
+    output_dict = {}
+    for a in var_a:
+        if a not in output_dict:
+            output_dict[a] = {}
+
+        for b in var_b:
+            if b not in output_dict[a]:
+                output_dict[a][b] = 1
+            else:
+                output_dict[a][b] += 1
+
+    return output_dict
+
+
 def compute_metrics(y_test, y_pred):
     """
         Generate classification_report (accuracy metrics agains y_test) for each categories of y_pred
@@ -192,6 +207,30 @@ def evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report):
 def fit_model(model, X_train, y_train):
     print('Fitting the model...')
     model.fit(X_train, y_train)
+
+
+def get_list_of_cat(df):
+    cat_idx = {0: 'related', 1: 'request', 2: 'offer', 3: 'aid_related',
+               4: 'medical_help', 5: 'medical_products', 6: 'search_and_rescue',
+               7: 'security', 8: 'military', 9: 'child_alone', 10: 'water',
+               11: 'food', 12: 'shelter', 13: 'clothing', 14: 'money',
+               15: 'missing_people', 16: 'refugees', 17: 'death',
+               18: 'other_aid', 19: 'infrastructure_related', 20: 'transport',
+               21: 'buildings', 22: 'electricity', 23: 'tools', 24: 'hospitals',
+               25: 'shops', 26: 'aid_centers', 27: 'other_infrastructure',
+               28:'weather_related', 29: 'floods', 30: 'storm', 31: 'fire',
+               32: 'earthquake', 33: 'cold', 34: 'other_weather',
+               35: 'direct_report'}
+
+    list_of_cats = {}
+    for row in range(len(df)):
+        list_of_cat = []
+        for k in range(0, df.shape[1]-4):
+            if df.iloc[row, k] == 1:
+                list_of_cat.append(cat_idx[k])
+        list_of_cats[row] = list_of_cat
+
+    return list_of_cats
 
 
 def is_model(model_path):
@@ -261,6 +300,7 @@ def prepare_model(prepare_model_dict):
     df = prepare_model_dict['df']
     count_vect_params = prepare_model_dict['count_vect_params']
     clf_params = prepare_model_dict['clf_params']
+    list_of_cats = prepare_model_dict['list_of_cats']
 
     print('Preparing the model...')
     use_loaded_model = is_model(model_path)
@@ -271,13 +311,20 @@ def prepare_model(prepare_model_dict):
 
     if use_loaded_model is False:
         if full_txt_process:
-            pipeline = structure_pipeline(df, count_vect_params, clf_params, True)
+            word_cat_dict = word_count_per_cat(df, list_of_cats, 'full_txt_process')
+            full_txt_params = [True, word_cat_dict]
+            pipeline = structure_pipeline(df, count_vect_params, clf_params, full_txt_params)
         else:
-            pipeline = structure_pipeline(df, count_vect_params, clf_params)
+            full_txt_params = [False, {}]
+            pipeline = structure_pipeline(df, count_vect_params, clf_params, full_txt_params)
 
         model, scenario = build_model(pipeline, grid_search, g_s_params)
 
     return model, scenario
+
+
+def preprocess_visualisation(list_of_cats):
+    print('Yay!')
 
 
 def save_model(model_path, model):
@@ -287,10 +334,10 @@ def save_model(model_path, model):
     print('Model saved!')
 
 
-def structure_pipeline(df, count_vect_params, clf_params, full_txt_process=False):
+def structure_pipeline(df, count_vect_params, clf_params, full_txt_params):
 
-    if full_txt_process:
-        word_cat_dict = word_count_per_cat(df)
+    if full_txt_params[0]:
+        word_cat_dict = full_txt_params[1]
 
         pipeline = Pipeline([
             ('features', FeatureUnion([
@@ -363,38 +410,18 @@ def tokenize(text):
     return words
 
 
-def word_count_per_cat(df):
-    cat_idx = {0: 'related', 1: 'request', 2: 'offer', 3: 'aid_related',
-               4: 'medical_help', 5: 'medical_products', 6: 'search_and_rescue',
-               7: 'security', 8: 'military', 9: 'child_alone', 10: 'water',
-               11: 'food', 12: 'shelter', 13: 'clothing', 14: 'money',
-               15: 'missing_people', 16: 'refugees', 17: 'death',
-               18: 'other_aid', 19: 'infrastructure_related', 20: 'transport',
-               21: 'buildings', 22: 'electricity', 23: 'tools', 24: 'hospitals',
-               25: 'shops', 26: 'aid_centers', 27: 'other_infrastructure',
-               28:'weather_related', 29: 'floods', 30: 'storm', 31: 'fire',
-               32: 'earthquake', 33: 'cold', 34: 'other_weather', 
-               35: 'direct_report'}
-
-    word_cat_dict = {}
+def word_count_per_cat(df, list_of_cats, process):
     for row in range(len(df)):
         message = df.iloc[row, 1]
-        list_of_cat = []
-        for k in range(0, df.shape[1]-4):
-            if df.iloc[row, k] == 1:
-                list_of_cat.append(cat_idx[k])
         words = tokenize(message)
+        list_of_cat = list_of_cats[row]
 
         if list_of_cat != []:
-            for word in words:
-                if word not in word_cat_dict:
-                    word_cat_dict[word] = {}
+            if process == 'preprocess_viz':
+                word_cat_dict = build_output_dict(list_of_cat, words)
+            elif process == 'full_txt_process':
+                word_cat_dict = build_output_dict(words, list_of_cat)
 
-                for cat in list_of_cat:
-                    if cat not in word_cat_dict[word]:
-                        word_cat_dict[word][cat] = 1
-                    else:
-                        word_cat_dict[word][cat] += 1
     return word_cat_dict
 
 
@@ -411,6 +438,7 @@ def main():
             g_s_params = conf_data['grid_search_parameters']
             full_txt_process = conf_data['full_txt_process']
             print_report = conf_data['print_report']
+            preprocess_viz = conf_data['preprocess_viz']
 
             # we load the data from the database
             df = load_data(args.db_path, data_table)
@@ -422,13 +450,20 @@ def main():
             # we split the column 'message' of X and the whole y dataframe into train and test sets
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+            # we optionnaly compute the association row-list of categories for later use
+            if full_txt_process or preprocess_viz:
+                list_of_cats = get_list_of_cat(df)
+            else:
+                list_of_cats = {}
+
             # we build the pipeline
             prepare_model_dict = {'model_path': args.model_path,
                                   'grid_search': grid_search,
                                   'g_s_params': g_s_params, 'df': df,
                                   'full_txt_process': full_txt_process,
                                   'count_vect_params': count_vect_params,
-                                  'clf_params': clf_params}
+                                  'clf_params': clf_params,
+                                  'list_of_cats': list_of_cats}
 
             model, scenario = prepare_model(prepare_model_dict)
 
@@ -443,6 +478,10 @@ def main():
 
             # we save the model
             save_model(args.model_path, model)
+
+            # we preprocess the data for the visualisations
+            if preprocess_viz:
+                preprocess_visualisation(list_of_cats)
 
         else:
             print('Please specify the path or name of the target database where to load the data from')
