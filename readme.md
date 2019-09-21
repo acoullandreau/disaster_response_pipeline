@@ -32,6 +32,7 @@ There are several dependencies for this package. The versions provided here are 
 - numpy 1.16.4
 - pandas 0.25.0
 - pickle 4.0
+- plotly 4.1.1
 - os 
 - re 2.2.1
 - sklearn 0.21.2
@@ -65,6 +66,7 @@ General comments about the process_data.py script:
 General comments about the train_classifier.py:
 - It is structured as to allow flexibility in the way the model should be trained - parameters are set in a conf.json file allowing the user to fine tune which hyperparameters to use for CountVectorizer and RandomForestClassifier, as well as whether to use more advanced NLP transformers and grid_search
 - In order to avoid needing to always train a model from scratch, if the pickle file provided as an argument exist (i.e a model was already saved), the model saved is used as a base for **further** training - the hyperparameters set in the conf.json file should therefore be chosen in consequence!
+- If the model saved includes GridSearch, a message is displayed to the user emphasizing the 
 
 
 Web app
