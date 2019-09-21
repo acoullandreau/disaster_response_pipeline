@@ -313,7 +313,7 @@ def prepare_model(prepare_model_dict):
 
     if use_loaded_model is False:
         if full_txt_process:
-            word_count_per_cat(df, list_of_cats, 'full_txt_process')
+            word_cat_dict = word_count_per_cat(df, list_of_cats, 'full_txt_process')
             full_txt_params = [True, word_cat_dict]
             pipeline = structure_pipeline(df, count_vect_params, clf_params, full_txt_params)
         else:
