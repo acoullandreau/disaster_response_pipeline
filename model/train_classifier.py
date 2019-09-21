@@ -134,8 +134,7 @@ def build_model(pipeline, grid_search, params):
     return model, scenario
 
 
-def build_output_dict(var_a, var_b):
-    output_dict = {}
+def build_output_dict(output_dict, var_a, var_b):
     for a in var_a:
         if a not in output_dict:
             output_dict[a] = {}
@@ -145,8 +144,6 @@ def build_output_dict(var_a, var_b):
                 output_dict[a][b] = 1
             else:
                 output_dict[a][b] += 1
-
-    return output_dict
 
 
 def comp_avg_length(X):
@@ -366,7 +363,7 @@ def preprocess_visualisation(list_of_cats, df):
         sorted_array = sorted(word_cat_dict[category], key=word_cat_dict[category].get, reverse=True)[0:5]
         first_word.append(sorted_array[0])
         first_word_count.append(word_cat_dict[category][sorted_array[0]])
-        
+
     pop_word['first_word'] = first_word
     pop_word['first_word_count'] = first_word_count
     pickle.dump(pop_word, open('data/df_pop_word.pkl', 'wb'))
@@ -456,6 +453,7 @@ def tokenize(text):
 
 
 def word_count_per_cat(df, list_of_cats, process):
+    word_cat_dict = {}
     for row in range(len(df)):
         message = df.iloc[row, 1]
         words = tokenize(message)
@@ -463,9 +461,9 @@ def word_count_per_cat(df, list_of_cats, process):
 
         if list_of_cat != []:
             if process == 'preprocess_viz':
-                word_cat_dict = build_output_dict(list_of_cat, words)
+                build_output_dict(word_cat_dict, list_of_cat, words)
             elif process == 'full_txt_process':
-                word_cat_dict = build_output_dict(words, list_of_cat)
+                build_output_dict(word_cat_dict, words, list_of_cat)
 
     return word_cat_dict
 
