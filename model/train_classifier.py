@@ -330,7 +330,7 @@ def prepare_model(prepare_model_dict):
 
 def preprocess_visualisation(list_of_cats, df):
 
-    # save preprocessed df for imbalance of class
+    # save preprocessed df for imbalance of class bar chart
     df_source = df.drop(['id', 'message', 'original', 'genre'], axis=1)
     counts = []
     categories = list(df_source.columns.values)
@@ -353,6 +353,23 @@ def preprocess_visualisation(list_of_cats, df):
     df_avg_length['genre'] = df['genre']
     data_length = df_avg_length[df_avg_length['length'] < 40]
     pickle.dump(data_length, open('data/df_word_length.pkl', 'wb'))
+
+    # save proprocessed df for most popular word per category bar chart
+    word_cat_dict = word_cat_dict = word_count_per_cat(df, list_of_cats, 'preprocess_visualisation')
+
+    pop_word = pd.DataFrame()
+    pop_word['category'] = word_cat_dict.keys()
+    first_word = []
+    first_word_count = []
+
+    for category in word_cat_dict:
+        sorted_array = sorted(word_cat_dict[category], key=word_cat_dict[category].get, reverse=True)[0:5]
+        first_word.append(sorted_array[0])
+        first_word_count.append(word_cat_dict[category][sorted_array[0]])
+        
+    pop_word['first_word'] = first_word
+    pop_word['first_word_count'] = first_word_count
+    pickle.dump(pop_word, open('data/df_pop_word.pkl', 'wb'))
 
 
 def save_model(model_path, model):

@@ -2,6 +2,7 @@ from bokeh.palettes import viridis
 import joblib
 import pandas as pd
 from plotly.graph_objects import Bar, Heatmap, Scatter
+import os
 import re
 
 from nltk.corpus import stopwords
@@ -50,7 +51,7 @@ def tokenize(text):
     return words
 
 
-def build_color_palette(unique_target, target):
+def build_color_palette(target):
     color_palette = viridis(len(unique_target))
     color_item = {}
     i = 0
@@ -75,56 +76,67 @@ def return_figures(df):
     figures = []
 
     # visualize imbalance of classes
-    graph_one = []
-    data_stat = joblib.load('data/df_class_imbalance.pkl')
+    if os.path.isfile('data/df_class_imbalance.pkl'):
+        graph_one = []
+        data_stat = joblib.load('data/df_class_imbalance.pkl')
 
-    graph_one.append(
-        Bar(
-            name='0',
-            x=data_stat['Disaster message category'],
-            y=data_stat['Distribution ratio - 0']),
-        Bar(
-            name='1',
-            x=data_stat['Disaster message category'],
-            y=data_stat['Distribution ratio - 1'])
+        graph_one.append(
+            Bar(
+                name='0',
+                x=data_stat['Disaster message category'],
+                y=data_stat['Distribution ratio - 0']))
+        graph_one.append(
+            Bar(
+                name='1',
+                x=data_stat['Disaster message category'],
+                y=data_stat['Distribution ratio - 1'])
 
-    )
+        )
 
-    layout_one = dict(barmode='group',
-                      title='Distribution ratio of messages for each disaster category',
-                      yaxis=dict(title="Percentage"),
-                      xaxis=dict(title="Category", tickangle=-45))
+        layout_one = dict(barmode='group',
+                          title='Distribution ratio of messages for each disaster category',
+                          yaxis=dict(title="Percentage"),
+                          xaxis=dict(title="Category", tickangle=-45),
+                          margin=dict(b=160))
+
+        figures.append(dict(data=graph_one, layout=layout_one))
 
     # visualize average message length
-    graph_two = []
-    data_length = joblib.load('data/df_word_length.pkl')
+    if os.path.isfile('data/df_word_length.pkl'):
+        graph_two = []
+        data_length = joblib.load('data/df_word_length.pkl')
 
-    graph_two.append(
-        Scatter(
-            name='direct',
-            x=data_length[data_length['genre'] == 'direct']['index'],
-            y=data_length[data_length['genre'] == 'direct']['length'],
-            showlegend=True,
-            mode='markers',
-        ),
-        Scatter(
-            name='news',
-            x=data_length[data_length['genre'] == 'news']['index'],
-            y=data_length[data_length['genre'] == 'news']['length'],
-            showlegend=True,
-            mode='markers',
-        ),
-        Scatter(
-            name='social',
-            x=data_length[data_length['genre'] == 'social']['index'],
-            y=data_length[data_length['genre'] == 'social']['length'],
-            showlegend=True,
-            mode='markers',
+        graph_two.append(
+            Scatter(
+                name='direct',
+                x=data_length[data_length['genre'] == 'direct']['index'],
+                y=data_length[data_length['genre'] == 'direct']['length'],
+                showlegend=True,
+                mode='markers',
+            ))
+        graph_two.append(
+            Scatter(
+                name='news',
+                x=data_length[data_length['genre'] == 'news']['index'],
+                y=data_length[data_length['genre'] == 'news']['length'],
+                showlegend=True,
+                mode='markers',
+            ))
+        graph_two.append(
+            Scatter(
+                name='social',
+                x=data_length[data_length['genre'] == 'social']['index'],
+                y=data_length[data_length['genre'] == 'social']['length'],
+                showlegend=True,
+                mode='markers',
+            )
         )
-    )
 
-    layout_two = dict(title='Average number of words per message',
-                      labels=dict(length="Average length"))
+        layout_two = dict(title='Average number of words per message',
+                          yaxis=dict(title="Average length"),
+                          xaxis=dict(visible=False, title="Message id"))
+        
+        figures.append(dict(data=graph_two, layout=layout_two))
 
     # visualize count per genre
     graph_three = []
@@ -141,6 +153,8 @@ def return_figures(df):
 
     layout_three = dict(title='Distribution of Message Genres',
                         yaxis=dict(title="Count"), xaxis=dict(title="Genre"))
+
+    figures.append(dict(data=graph_three, layout=layout_three))
 
     # visualize category correlation heat map
     graph_four = []
@@ -161,13 +175,36 @@ def return_figures(df):
     )
 
     layout_four = dict(title='Correlation map of the categories',
-                       height=900)
+                       height=900, margin=dict(l=130, b=160))
+
+    figures.append(dict(data=graph_four, layout=layout_four))
 
     # visualize most frequent word per category
+    if os.path.isfile('data/df_pop_word.pkl'):
+        graph_five = []
+        pop_word = joblib.load('data/df_pop_word.pkl')
+        most_used_words = pop_word['first_word'].unique()
+        color_item = build_color_palette(most_used_words)
+        colors = get_color_scale(color_item, pop_word['first_word'])
 
-    figures.append(dict(data=graph_one, layout=layout_one))
-    figures.append(dict(data=graph_two, layout=layout_two))
-    figures.append(dict(data=graph_three, layout=layout_three))
-    figures.append(dict(data=graph_four, layout=layout_four))
+        graph_five.append(
+            Bar(
+                x=pop_word['category'],
+                y=pop_word['first_word_count'],
+                text=pop_word['first_word'],
+                textposition='outside',
+                textangle=-60,
+                textfont = {'size':10},
+                marker={'color': colors}
+            )
+
+        )
+
+        layout_five = dict(title='Most used word in all messages for each category',
+                           yaxis=dict(title="Count of messages"),
+                           xaxis=dict(tickangle=-45, title="Category"),
+                           height=900, margin=dict(l=130, b=140))
+
+        figures.append(dict(data=graph_five, layout=layout_five))
 
     return figures
