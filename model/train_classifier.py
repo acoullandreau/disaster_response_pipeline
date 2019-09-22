@@ -2,7 +2,8 @@
     This script aims at:
     - training a model using the data from a database (training set)
     - predicting labels on a testing set and reporting accuracy metrics
-    - use GridSearch if required to look for the best combination of hyperparameters
+    - use GridSearch if required to look for the best combination of 
+    hyperparameters
     - save the model's parameters as a pickle file that can be loaded later on
 
     It is assumed that this script will be ran from the highest level of
@@ -10,29 +11,36 @@
 
     Input:
     ------
-    To launch the script, type the following command from the directory where the script is contained:
+    To launch the script, type the following command from the directory where
+    the script is contained:
     python train_classifier.py DisasterResponse.db classifier.pkl conf.json
 
     where DisasterResponse.db is the database containing the data source
-    classifier.pkl is the name to give to the pickle file created to save the model
-    and conf.json contains the table to use in the database and all the
+    classifier.pkl is the name to give to the pickle file created to save the
+    model and conf.json contains the table to use in the database and all the
     optional parameters to train the model, such as whether to use grid search,
-    with which hyperpameters...and whether we want to preprocess data for web app visualizations
+    with which hyperpameters...and whether we want to preprocess data for web
+    app visualizations.
 
     Output:
     ------
-    The pickle file saving the model will be created in the same directory where the script is contained.
+    The pickle file saving the model will be created in the same directory
+    where the script is contained.
     On the console will be printed:
-    - the best parameters used by GridSearch (if -g was passed as an argument to the script)
+    - the best parameters used by GridSearch (if -g was passed as an argument
+    to the script)
     - the accuracy metrics of the prediction of the model
 
     Note on the parameters to use in the conf.json file
     - CountVectorizer is used, see sklearn doc to use the right hyperparameters
-    - RandomForestClassifier is used, see sklearn doc to use the right hyperparameters
+    - RandomForestClassifier is used, see sklearn doc to use the right
+    hyperparameters
     - TF-IDF is currently used only with default hyperparameters, it is not
-    possible to add some in the conf.file without updating the code of this script
+    possible to add some in the conf.file without updating the code of this
+    script
     - if full_txt_process is true:
-        - features__input_text_pipeline__vect__ to modify count_vectorizer parameters
+        - features__input_text_pipeline__vect__ to modify count_vectorizer
+        parameters
         - features__input_text_pipeline__tfidf__ to modify tfidf parameters
         - clf__estimator__ to modify classifier parameters
     - if full_txt_process is false:
@@ -138,7 +146,7 @@ def build_model(pipeline, grid_search, params):
 
 def build_output_dict(output_dict, var_a, var_b):
     """
-        Support function to add entries and values to a dictionary. 
+        Support function to add entries and values to a dictionary.
         This function is used to build the word_cat_dict, having either
         the word as a key or the category (var_a and var_b being either
         words of a message or list_of_cats).
@@ -170,7 +178,7 @@ def comp_avg_length(X):
             X - the text to compute the average length for
         Outputs:
             X_avg_length as a dataframe of the average length
-            of each document inside the text X. 
+            of each document inside the text X.
     """
     X_avg_length = pd.Series(X).apply(word_length)
     return pd.DataFrame(X_avg_length)
@@ -221,7 +229,7 @@ def create_df_from_dict(results, scenario):
 
 def evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report):
     """
-        Evaluate the performance metrics of a model. 
+        Evaluate the performance metrics of a model.
 
         Inputs:
             grid_search - whether grid_search was used to fit the model
@@ -249,8 +257,8 @@ def evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report):
 
 def fit_model(model, X_train, y_train):
     """
-        Fit the model on X_train and y_train. 
-    """       
+        Fit the model on X_train and y_train.
+    """
     print('Fitting the model...')
     model.fit(X_train, y_train)
 
@@ -291,14 +299,14 @@ def get_list_of_cat(df):
 def is_model(model_path):
     """
         Evaluate whether a pickle file with the model_path exists.
-        If so, the saved model can be loaded and retrained. 
+        If so, the saved model can be loaded and retrained.
 
         Inputs:
             model_path - the relative path to the saved model pickle file
         Outputs:
             bool - whether the path provided points to an existing file or not
 
-    """  
+    """
     if os.path.isfile(model_path):
         return True
     return False
@@ -366,8 +374,8 @@ def load_model(model_path, grid_search, params):
 
 def predict_model(model, X_test):
     """
-        Predict the labels for X_test using the model. 
-    """ 
+        Predict the labels for X_test using the model.
+    """
     print('Predicting the categories...')
     y_pred = model.predict(X_test)
     return y_pred
@@ -432,7 +440,7 @@ def preprocess_visualisation(list_of_cats, df):
         Inputs:
             df - the dataframe containing the data available in the table
             list_of_cats - the list of categories associated with each row
-            of the df  
+            of the df
         Outputs:
             pickle files with the processed dataframes
     """
@@ -505,7 +513,7 @@ def structure_pipeline(df, count_vect_params, clf_params, full_txt_params):
             df - the dataframe containing the data available in the table
             count_vect_params - the hyperparameters of CountVectorizer
             clf_params - the hyperparameters of RandomForestClassifier
-            full_txt_params - whether to use custom transformers and if so, 
+            full_txt_params - whether to use custom transformers and if so,
             the word_cat_dict
         Outputs:
             pipeline - the pipeline to use as a model
@@ -587,7 +595,7 @@ def tokenize(text):
 def word_count_per_cat(df, list_of_cats, process):
     """
         Build a dictionary that matches categories with the count of words
-        used in the messages labeled with these categories. 
+        used in the messages labeled with these categories.
         The word_cat_dict dictionary is used both for web app visualisation
         and NLP feature engineering.
 
@@ -595,14 +603,14 @@ def word_count_per_cat(df, list_of_cats, process):
             df - the dataframe containing the data available in the table
             list_of_cats - the list of categories associated with each row
             of the df
-            process - whether we want categories as a key (process = 
-            'preprocess_viz') or the word as a key (process = 
+            process - whether we want categories as a key (process =
+            'preprocess_viz') or the word as a key (process =
             full_txt_process')
-            
+
         Outputs:
             word_cat_dict - a dictionary that matches categories with
             the count of words used in all messages labeled with these
-            categories. 
+            categories.
     """
     word_cat_dict = {}
 
@@ -627,7 +635,7 @@ def word_length(text):
         Inputs:
             text - the text to compute the average length for
         Outputs:
-            avg_length - the average length of the words of 
+            avg_length - the average length of the words of
             the text
     """
     words = text.split()
@@ -683,6 +691,7 @@ def main():
 
             # we predict the categories using the testing set
             y_pred = predict_model(model, X_test)
+            print(y_pred)
 
             # we compute the score metrics of the model's prediction
             evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report)
