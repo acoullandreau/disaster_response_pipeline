@@ -17,7 +17,7 @@
     classifier.pkl is the name to give to the pickle file created to save the model
     and conf.json contains the table to use in the database and all the
     optional parameters to train the model, such as whether to use grid search,
-    with which hyperpameters...
+    with which hyperpameters...and whether we want to preprocess data for web app visualizations
 
     Output:
     ------
@@ -39,6 +39,8 @@
         - vect__ to modify count_vectorizer parameters
         - tfidf__ to modify tfidf parameters
         - clf__estimator__ to modify classifier parameters
+    - if preprocess_viz is true, computing of data will be performed and
+    dataframes will be saved to be used in the web app to build visualisations
 """
 
 # import libraries
@@ -135,6 +137,20 @@ def build_model(pipeline, grid_search, params):
 
 
 def build_output_dict(output_dict, var_a, var_b):
+    """
+        Support function to add entries and values to a dictionary. 
+        This function is used to build the word_cat_dict, having either
+        the word as a key or the category (var_a and var_b being either
+        words of a message or list_of_cats).
+
+        Inputs:
+            output_dict - the dictionary to populate
+            var_a - the set of values to use as keys
+            var_b - the set of values to use as values and counts
+        Outputs:
+            The dictionary passed as an input is updated, no value
+            is returned.
+    """
     for a in var_a:
         if a not in output_dict:
             output_dict[a] = {}
@@ -147,6 +163,15 @@ def build_output_dict(output_dict, var_a, var_b):
 
 
 def comp_avg_length(X):
+    """
+        Compute the average length of a message.
+
+        Inputs:
+            X - the text to compute the average length for
+        Outputs:
+            X_avg_length as a dataframe of the average length
+            of each document inside the text X. 
+    """
     X_avg_length = pd.Series(X).apply(word_length)
     return pd.DataFrame(X_avg_length)
 
@@ -195,23 +220,51 @@ def create_df_from_dict(results, scenario):
 
 
 def evaluate_model(grid_search, model, y_test, y_pred, scenario, print_report):
+    """
+        Evaluate the performance metrics of a model. 
+
+        Inputs:
+            grid_search - whether grid_search was used to fit the model
+            model - the model to use to evaluate its accuracy
+            y_test - the reference labels for the training set
+            y_pred - the predicting labels using the model
+            scenario - the name of the scenario being evaluated (used
+            in the metrics report)
+            print_report - whether to print the metrics report
+        Outputs:
+            df_result - stored in memory
+            printed report if print_report is true
+    """
     print('Evaluating the model...')
     if grid_search:
         print('The best combination of parameters is the following: ', model.best_params_)
-        results = compute_metrics(y_test, y_pred)
-        df_results = pd.DataFrame()
-        df_results = append_results_to_df(df_results, results, scenario)
-        if print_report:
-            print('Score metrics report:\n')
-            print(df_results)
+
+    results = compute_metrics(y_test, y_pred)
+    df_results = pd.DataFrame()
+    df_results = append_results_to_df(df_results, results, scenario)
+    if print_report:
+        print('Score metrics report:\n')
+        print(df_results)
 
 
 def fit_model(model, X_train, y_train):
+    """
+        Fit the model on X_train and y_train. 
+    """       
     print('Fitting the model...')
     model.fit(X_train, y_train)
 
 
 def get_list_of_cat(df):
+    """
+        Computes the list of categories associated to each row of df.
+
+        Inputs:
+            df - the dataframe containing the data available in the table
+        Outputs:
+            list_of_cats -> a dictionary, where the key is the row index
+            and the value the list of categories associated to the row
+    """
     cat_idx = {0: 'related', 1: 'request', 2: 'offer', 3: 'aid_related',
                4: 'medical_help', 5: 'medical_products', 6: 'search_and_rescue',
                7: 'security', 8: 'military', 9: 'child_alone', 10: 'water',
@@ -236,6 +289,16 @@ def get_list_of_cat(df):
 
 
 def is_model(model_path):
+    """
+        Evaluate whether a pickle file with the model_path exists.
+        If so, the saved model can be loaded and retrained. 
+
+        Inputs:
+            model_path - the relative path to the saved model pickle file
+        Outputs:
+            bool - whether the path provided points to an existing file or not
+
+    """  
     if os.path.isfile(model_path):
         return True
     return False
@@ -266,6 +329,19 @@ def load_data(database_path, table_name):
 
 
 def load_model(model_path, grid_search, params):
+    """
+        If the model_path points to an existing pickle file, the model can be loaded
+        as to be trained further using the parameters set in the conf.json file.
+
+        Inputs:
+            model_path - the path to the saved model pickle file
+            grid_search - whether to use grid_search to train the model further
+            params - the grid_search parameters to use
+        Outputs:
+            model - the instance of the model
+            scenario - the name of the scenario to use to identify the model
+            in the performance report
+    """
     loaded_model = pickle.load(open(model_path, 'rb'))
 
     if 'cv' in loaded_model.get_params().keys():
@@ -289,12 +365,36 @@ def load_model(model_path, grid_search, params):
 
 
 def predict_model(model, X_test):
+    """
+        Predict the labels for X_test using the model. 
+    """ 
     print('Predicting the categories...')
     y_pred = model.predict(X_test)
     return y_pred
 
 
 def prepare_model(prepare_model_dict):
+    """
+        Processes information to know what model to use for the training.
+        This function takes a dictionary as an input and depending on the
+        values provided returns the appropriate combination of mode instance
+        and scenario name.
+
+        Inputs:
+            prepare_model_dict - the dictionary of arguments
+                prepare_model_dict = {'model_path': args.model_path,
+                          'grid_search': grid_search,
+                          'g_s_params': g_s_params, 'df': df,
+                          'full_txt_process': full_txt_process,
+                          'count_vect_params': count_vect_params,
+                          'clf_params': clf_params,
+                          'list_of_cats': list_of_cats}
+        Outputs:
+            model - the instance of the model
+            scenario - the name of the scenario to use to identify the model
+            in the performance report
+    """
+
     model_path = prepare_model_dict['model_path']
     grid_search = prepare_model_dict['grid_search']
     g_s_params = prepare_model_dict['g_s_params']
@@ -325,23 +425,17 @@ def prepare_model(prepare_model_dict):
     return model, scenario
 
 
-def word_count_per_cat(df, list_of_cats, process):
-    word_cat_dict = {}
-    for row in range(len(df)):
-        message = df.iloc[row, 1]
-        words = tokenize(message)
-        list_of_cat = list_of_cats[row]
-
-        if list_of_cat != []:
-            if process == 'preprocess_viz':
-                build_output_dict(word_cat_dict, list_of_cat, words)
-            elif process == 'full_txt_process':
-                build_output_dict(word_cat_dict, words, list_of_cat)
-    print(word_cat_dict)
-    return word_cat_dict
-
-
 def preprocess_visualisation(list_of_cats, df):
+    """
+        Preprocessing of the data used to build visualiaions on the web app.
+
+        Inputs:
+            df - the dataframe containing the data available in the table
+            list_of_cats - the list of categories associated with each row
+            of the df  
+        Outputs:
+            pickle files with the processed dataframes
+    """
 
     print('Preprocessing the data for visualisations')
     # save preprocessed df for imbalance of class bar chart
@@ -387,6 +481,16 @@ def preprocess_visualisation(list_of_cats, df):
 
 
 def save_model(model_path, model):
+    """
+        Saves the model as a pickle file.
+
+        Inputs:
+            model_path - the path to the repository and name to give
+            to the saved model
+            model - the model instance to serialize
+        Outputs:
+            the model saved in a pickle file
+    """
     print('Saving the model...')
     filename = model_path
     pickle.dump(model, open(filename, 'wb'))
@@ -394,7 +498,18 @@ def save_model(model_path, model):
 
 
 def structure_pipeline(df, count_vect_params, clf_params, full_txt_params):
+    """
+        Constructs a pipeline with the appropriate estimators.
 
+        Inputs:
+            df - the dataframe containing the data available in the table
+            count_vect_params - the hyperparameters of CountVectorizer
+            clf_params - the hyperparameters of RandomForestClassifier
+            full_txt_params - whether to use custom transformers and if so, 
+            the word_cat_dict
+        Outputs:
+            pipeline - the pipeline to use as a model
+    """
     if full_txt_params[0]:
         word_cat_dict = full_txt_params[1]
 
@@ -470,7 +585,27 @@ def tokenize(text):
 
 
 def word_count_per_cat(df, list_of_cats, process):
+    """
+        Build a dictionary that matches categories with the count of words
+        used in the messages labeled with these categories. 
+        The word_cat_dict dictionary is used both for web app visualisation
+        and NLP feature engineering.
+
+        Inputs:
+            df - the dataframe containing the data available in the table
+            list_of_cats - the list of categories associated with each row
+            of the df
+            process - whether we want categories as a key (process = 
+            'preprocess_viz') or the word as a key (process = 
+            full_txt_process')
+            
+        Outputs:
+            word_cat_dict - a dictionary that matches categories with
+            the count of words used in all messages labeled with these
+            categories. 
+    """
     word_cat_dict = {}
+
     for row in range(len(df)):
         message = df.iloc[row, 1]
         words = tokenize(message)
@@ -478,14 +613,23 @@ def word_count_per_cat(df, list_of_cats, process):
 
         if list_of_cat != []:
             if process == 'preprocess_viz':
-                word_cat_dict = build_output_dict(word_cat_dict, list_of_cat, words)
+                build_output_dict(word_cat_dict, list_of_cat, words)
             elif process == 'full_txt_process':
-                word_cat_dict = build_output_dict(word_cat_dict, words, list_of_cat)
-    print(word_cat_dict)
+                build_output_dict(word_cat_dict, words, list_of_cat)
+
     return word_cat_dict
 
 
 def word_length(text):
+    """
+        Compute the average length of the words of a message.
+
+        Inputs:
+            text - the text to compute the average length for
+        Outputs:
+            avg_length - the average length of the words of 
+            the text
+    """
     words = text.split()
     if len(words) > 0:
         avg_length = sum(len(word) for word in words)/len(words)
@@ -512,7 +656,7 @@ def main():
 
             # define features and labels
             X = df['message']  # X is only the message column
-            y = df.iloc[:, 5:]
+            y = df.iloc[:, 4:]
 
             # we split the column 'message' of X and the whole y dataframe into train and test sets
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)

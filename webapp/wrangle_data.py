@@ -52,6 +52,14 @@ def tokenize(text):
 
 
 def build_color_palette(target):
+    """
+        Creates a color from the viridis color palette to each value of the target list.
+
+        Inputs:
+            target - the list of values to assign a color tp
+        Outputs:
+            color_item - the RGB color codes
+    """
     color_palette = viridis(len(target))
     color_item = {}
     i = 0
@@ -64,6 +72,16 @@ def build_color_palette(target):
 
 
 def get_color_scale(color_item, target):
+    """
+        Assigns a color to each value of the target list, using the associations
+        in color_item.
+
+        Inputs:
+            color_item - the color to assign to each value
+            target - the list of values to assign a color to
+        Outputs:
+            colors - a list of the RGB color codes for all values of target
+    """
     colors = ['rgb({0}, {1}, {2})'.format(color_item[item_to_color][0],
                                           color_item[item_to_color][1],
                                           color_item[item_to_color][2])
