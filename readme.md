@@ -79,29 +79,29 @@ The web app is structured in two parts:
 
 The query section allows a user to input a message and get the prediction of its category using a trained model.
 
-For example, if we input the message "", we get:
-<sreenshot>
+For example, if we input the message "We are more than 50 people sleeping on the street. Please help up find tent, food.", we get:
+![alt text](data/img_query_1.png "We are more than 50 people sleeping on the street. Please help up find tent, food.")
 
 Or the message "":
-<sreenshot>
+![alt text](data/img_query_2.png "I am sick and need medicine urgently, please help me!")
 
 Note that the user input is tokenized to ensure maximum performance of the model.
 
 The visualisation of the training data provides an insight on:
 - the distribution of message length
-<sreenshot>
+![alt text](data/img_avg_length.png "Average length")
 
 - the imbalance of classes
-<sreenshot>
+![alt text](data/img_imbalance_class.png "Imbalance of classed")
 
 - the number of messages for each genre (news, social, direct)
-<sreenshot>
+![alt text](data/img_distri_genre.png "Distribution of genres")
 
 - the most popular word in messages for each category
-<sreenshot>
+![alt text](data/img_pop_word.png "Popular words per category")
 
 - the correlation between categories
-<sreenshot>
+![alt text](data/img_corr_map.png "Correlation map")
 
 As to increase performance when loading the web app, most of the data needed to produce these visualisations is computed when training the model (option available in the conf.json file). The dataframes used are saved along with the pickle file of the model. 
 
