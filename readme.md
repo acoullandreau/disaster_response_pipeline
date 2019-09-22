@@ -82,7 +82,7 @@ The query section allows a user to input a message and get the prediction of its
 For example, if we input the message "We are more than 50 people sleeping on the street. Please help up find tent, food.", we get:
 ![alt text](data/img_query_1.png "We are more than 50 people sleeping on the street. Please help up find tent, food.")
 
-Or the message "":
+Or the message "I am sick and need medicine urgently, please help me!":
 ![alt text](data/img_query_2.png "I am sick and need medicine urgently, please help me!")
 
 Note that the user input is tokenized to ensure maximum performance of the model.
