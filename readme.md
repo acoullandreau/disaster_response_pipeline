@@ -73,9 +73,37 @@ General comments about the train_classifier.py:
 Web app
 -------
 
-How to use it
-Presentation of the different visualizations available
+The web app is structured in two parts:
+- the query section
+- the visualisations on the training data
 
+The query section allows a user to input a message and get the prediction of its category using a trained model.
+
+For example, if we input the message "", we get:
+<sreenshot>
+
+Or the message "":
+<sreenshot>
+
+Note that the user input is tokenized to ensure maximum performance of the model.
+
+The visualisation of the training data provides an insight on:
+- the distribution of message length
+<sreenshot>
+
+- the imbalance of classes
+<sreenshot>
+
+- the number of messages for each genre (news, social, direct)
+<sreenshot>
+
+- the most popular word in messages for each category
+<sreenshot>
+
+- the correlation between categories
+<sreenshot>
+
+As to increase performance when loading the web app, most of the data needed to produce these visualisations is computed when training the model (option available in the conf.json file). The dataframes used are saved along with the pickle file of the model. 
 
 
 Comments on the data
